@@ -1,19 +1,11 @@
-import { test, expect, chromium, type BrowserContext, type Page, type Locator } from '@playwright/test';
-import path from 'path';
+import { test, expect, type Page, type Locator, type BrowserContext } from '@playwright/test';
+import { bootstrap, Dappwright, MetaMaskWallet } from '@tenkeylabs/dappwright';
+import { handleMetaMaskPopup, TIMEOUT } from './helpers/metamask';
 
-// Environment configuration
 const CONFIG = {
   seedPhrase: process.env.SEED_PHRASE || 'test test test test test test test test test test test junk',
   password: process.env.WALLET_PASSWORD || 'Tester@123',
   prjxSwapUrl: 'https://www.prjx.com/swap',
-  metamaskExtensionPath: path.join(__dirname, '../metamask-extension'),
-} as const;
-
-// Timeout configuration
-const TIMEOUT = {
-  SHORT: 1000,
-  MEDIUM: 3000,
-  LONG: 10000,
 } as const;
 
 /**
@@ -35,12 +27,11 @@ class PRJXSwapPage {
   }
 
   getWalletAddress(): Locator {
-    return this.page.locator('button').filter({ hasText: /0x[a-fA-F0-9]{4}/ }).first();
+    return this.page.locator('body > div.fixed > nav > div > div > div > div > button');
   }
 
   async navigate(): Promise<void> {
-    await this.page.goto(CONFIG.prjxSwapUrl);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.goto(CONFIG.prjxSwapUrl, { waitUntil: 'load' });
   }
 
   async clickConnectWallet(): Promise<void> {
@@ -52,107 +43,56 @@ class PRJXSwapPage {
     await expect(metamaskOption).toBeVisible({ timeout: TIMEOUT.LONG });
     await metamaskOption.click();
   }
-
-  async isWalletConnected(): Promise<boolean> {
-    return this.getWalletAddress().isVisible({ timeout: TIMEOUT.LONG });
-  }
-}
-
-/**
- * Page Object Model for MetaMask Popup
- */
-class MetaMaskPopup {
-  constructor(private page: Page) {}
-
-  get nextButton(): Locator {
-    return this.page.locator('button:has-text("Next")');
-  }
-
-  get connectButton(): Locator {
-    return this.page.locator('button:has-text("Connect")');
-  }
-
-  async approveConnection(): Promise<void> {
-    await this.page.waitForLoadState('load');
-    
-    // Click Next if available
-    if (await this.nextButton.isVisible({ timeout: TIMEOUT.MEDIUM })) {
-      await this.nextButton.click();
-      await this.page.waitForTimeout(500);
-    }
-
-    // Click Connect
-    await expect(this.connectButton).toBeVisible({ timeout: TIMEOUT.MEDIUM });
-    await this.connectButton.click();
-  }
-}
-
-/**
- * Browser helper utilities
- */
-class BrowserHelper {
-  static async launchWithMetaMask() {
-    return chromium.launch({
-      headless: false,
-      args: [
-        `--disable-extensions-except=${CONFIG.metamaskExtensionPath}`,
-        `--load-extension=${CONFIG.metamaskExtensionPath}`,
-      ],
-    });
-  }
-
-  static async findMetaMaskPopup(context: BrowserContext): Promise<Page | null> {
-    const pages = context.pages();
-    const metamaskPage = pages.find(p => {
-      const url = p.url();
-      return url.includes('notification') || url.includes('metamask');
-    });
-    
-    return metamaskPage || null;
-  }
 }
 
 test.describe('MetaMask Wallet Connection', () => {
-  test('should connect wallet to PRJX successfully', async () => {
-    const browser = await BrowserHelper.launchWithMetaMask();
-    const context = await browser.newContext();
-    const page = await context.newPage();
+  let wallet: Dappwright;
+  let context: BrowserContext;
+  let page: Page;
 
-    try {
-      // Arrange - Initialize page objects
-      const prjxPage = new PRJXSwapPage(page);
+  test.beforeAll(async () => {
+    [wallet, , context] = await bootstrap('', {
+      wallet: 'metamask',
+      version: MetaMaskWallet.recommendedVersion,
+      seed: CONFIG.seedPhrase,
+      headless: false,
+      password: CONFIG.password,
+    });
 
-      // Act - Navigate and initiate connection
-      await prjxPage.navigate();
-      await expect(prjxPage.connectWalletButton).toBeVisible({ timeout: TIMEOUT.LONG });
-      await prjxPage.clickConnectWallet();
+    page = await context.newPage();
+  });
 
-      // Wait for wallet modal
-      await page.waitForTimeout(TIMEOUT.SHORT);
-      await prjxPage.selectMetaMaskWallet();
+  test.afterAll(async () => {
+    await context.close();
+  });
 
-      // Handle MetaMask popup
-      await page.waitForTimeout(TIMEOUT.MEDIUM);
-      const metamaskPopupPage = await BrowserHelper.findMetaMaskPopup(context);
-      
-      if (!metamaskPopupPage) {
-        throw new Error('MetaMask popup window not found');
-      }
+  /**
+   * Verifies MetaMask wallet connection flow
+   * 
+   * @remarks
+   * Handles three MetaMask popup windows:
+   * - Connection request (Next/Connect)
+   * - Connection confirmation (Confirm/Connect)
+   * - Sign-in request (Sign)
+   */
+  test('should connect wallet successfully', async () => {
+    const prjxPage = new PRJXSwapPage(page);
 
-      const metamaskPopup = new MetaMaskPopup(metamaskPopupPage);
-      await metamaskPopup.approveConnection();
-
-      // Assert - Verify connection
-      await page.bringToFront();
-      await page.waitForTimeout(TIMEOUT.MEDIUM);
-      
-      const isConnected = await prjxPage.isWalletConnected();
-      expect(isConnected).toBe(true);
-
-      // Allow time to observe results
-      await page.waitForTimeout(TIMEOUT.LONG);
-    } finally {
-      await browser.close();
-    }
+    await prjxPage.navigate();
+    await expect(prjxPage.connectWalletButton).toBeVisible({ timeout: TIMEOUT.LONG });
+    
+    await prjxPage.clickConnectWallet();
+    
+    await prjxPage.selectMetaMaskWallet();
+    
+    // Handle MetaMask popups (connection, confirmation, sign-in)
+    await handleMetaMaskPopup(context, 'Next', 'Connect');
+    await handleMetaMaskPopup(context, 'Confirm', 'Connect');
+    await handleMetaMaskPopup(context, 'Sign', 'Confirm');
+    
+    const walletAddress = prjxPage.getWalletAddress();
+    await expect(walletAddress).toBeVisible({ timeout: 20000 });
+    
+    await page.screenshot({ path: 'screenshots/wallet-connected.png', fullPage: true });
   });
 });

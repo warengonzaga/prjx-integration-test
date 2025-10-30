@@ -1,7 +1,7 @@
 {
   "name": "project-x-qa-test",
   "version": "1.0.0",
-  "description": "Integration tests for Project X with MetaMask wallet connection",
+  "description": "Integration tests for Project X with MetaMask wallet connection using dAppwright",
   "scripts": {
     "test": "playwright test",
     "test:ui": "playwright test --ui",
@@ -10,7 +10,7 @@
   },
   "keywords": [
     "playwright",
-    "synpress",
+    "dappwright",
     "metamask",
     "web3",
     "testing"
@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0",
-    "@synthetixio/synpress": "3.7.2",
+    "@tenkeylabs/dappwright": "^2.11.3",
     "@types/node": "^20.10.0",
     "typescript": "^5.3.0"
   },
