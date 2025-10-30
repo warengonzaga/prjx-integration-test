@@ -1,0 +1,29 @@
+# Do not commit .env files with real credentials
+.env
+.env.local
+
+# Node modules
+node_modules/
+
+# Package manager
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Synpress
+synpress/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
