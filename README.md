@@ -1,66 +1,84 @@
-# Project X QA Test Suite
+# PRJX Integration Test Suite
 
-Integration tests for Project X (PRJX) using Playwright and dAppwright for MetaMask wallet testing.
+Automated end-to-end testing for PRJX platform using Playwright and dAppwright for Web3 wallet interactions.
 
 ## Prerequisites
 
-- Node.js v20 (LTS)
+- Node.js v20+
 - pnpm
 - Test MetaMask wallet (never use real funds)
 
-## Setup
+## Quick Start
 
 ```bash
 # Install dependencies
 pnpm install
 
-# Install Playwright browsers
+# Install browsers
 pnpm exec playwright install
 
 # Configure environment (optional)
 cp .env.example .env
-```
 
-## Running Tests
-
-```bash
+# Run tests
 pnpm test          # Headless mode
 pnpm test:headed   # Visible browser
-pnpm test:debug    # Debug mode
-pnpm test:ui       # Interactive UI mode
 ```
 
 ## Environment Variables
 
-Optional - defaults are provided in the test files. Copy `.env.example` to `.env` if you want to customize:
+Optional - defaults provided. Create `.env` to customize:
 
 ```env
+# MetaMask (test wallet only!)
 SEED_PHRASE="test test test test test test test test test test test junk"
 WALLET_PASSWORD="Tester@123"
-RPC_URL="https://eth.llamarpc.com"
+
+# Swap amount (optional, default: 1)
+SWAP_AMOUNT="0.5"
 ```
 
-⚠️ **Never commit real wallet credentials! Use TEST WALLETS ONLY!**
+⚠️ **Never use real credentials or commit `.env` file**
+
+## Tests
+
+### ✅ Wallet Connection
+
+Connects MetaMask wallet to PRJX platform
+
+### ✅ Referral Creation
+
+Opens referral dialog and verifies X connection requirement
+
+### ✅ Swap/Bridge
+
+Complete USDC swap transaction across networks
+
+- Configurable swap amounts
+- Conditional MetaMask approvals (1-2 popups)
+- Full screenshot documentation
 
 ## Project Structure
 
 ```text
-project-x-qa-test/
-├── tests/
-│   ├── wallet-connection.spec.ts    # Wallet connection test
-│   ├── referral-creation.spec.ts    # Referral creation test
-│   └── helpers/
-│       └── metamask.ts              # MetaMask helper functions
-├── playwright.config.ts              # Playwright config
-├── package.json                      # Dependencies
-├── tsconfig.json                     # TypeScript config
-└── .env.example                      # Environment template
+tests/
+├── wallet-connection.spec.ts    # Wallet connection
+├── referral-creation.spec.ts    # Referral dialog
+├── swap.spec.ts                 # Token swap/bridge
+└── helpers/metamask.ts          # MetaMask utilities
 ```
 
-## Current Tests
+## Troubleshooting
 
-- **Wallet Connection** - Connect wallet to Project X app
-- **Create Referral** - Connect wallet and attempt to create referral link (didn't proceed as it requires X account)
+**MetaMask popup issues:**
+
+- Ensure only one MetaMask extension installed
+- Use test wallet with minimal funds
+
+**Swap quote fails:**
+
+- Use SWAP_AMOUNT >= 0.5
+- Verify network connectivity
 
 ## License
 
